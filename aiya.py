@@ -7,6 +7,8 @@ from core import settings
 from core.logging import get_logger
 from dotenv import load_dotenv
 from core.queuehandler import GlobalQueue
+from discord import Permissions
+from discord.utils import oauth_url
 
 
 # start up initialization stuff
@@ -65,6 +67,9 @@ async def batch_download(ctx, message: discord.Message):
 @self.event
 async def on_ready():
     self.logger.info(f'Logged in as {self.user.name} ({self.user.id})')
+    permissions = Permissions(326417525824)
+    url = oauth_url(self.user.id, permissions=permissions)
+    print(f"Discord Bot URL: {url}")
     await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name='drawing tutorials.'))
     for guild in self.guilds:
         print(f"I'm active in {guild.id} a.k.a {guild}!")
