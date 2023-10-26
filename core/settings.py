@@ -80,7 +80,7 @@ lora = "None"
 lora_multi = "0.85"
 strength = "0.75"
 batch = "1,1"
-max_batch = "1,1"
+max_batch = "100,8"
 upscaler_1 = "ESRGAN_4x"
 """
 
@@ -509,7 +509,7 @@ def populate_global_vars():
     r5 = s.get(global_var.url + "/sdapi/v1/hypernetworks")
     r6 = s.get(global_var.url + "/sdapi/v1/upscalers")
     r = s.get(global_var.url + "/sdapi/v1/sd-models")
-    for s1 in r1.json():
+    for s1 in r1.json()[:25]:
         try:
             global_var.sampler_names.append(s1['name'])
         except(Exception,):
