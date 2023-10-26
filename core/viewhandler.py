@@ -2,6 +2,7 @@ import discord
 import random
 import re
 import os
+import math
 from discord.ui import InputText, Modal, View
 
 from core import ctxmenuhandler
@@ -86,9 +87,12 @@ class DrawModal(Modal):
         # expose each available (supported) option, even if output didn't use them
         ex_params = f'data_model:{display_name}'
         for index, value in enumerate(tuple_names[index_start:], index_start):
-            if index == 10 or 12 <= index <= 13 or index == 16:
+            if index == 10 or 12 <= index < 13 or index == 16:
                 continue
-            ex_params += f'\n{value}:{input_tuple[index]}'
+            if index == 13:
+                ex_params += f'\n{value}:{input_tuple[index][0]},{input_tuple[index][1]}'
+            else:
+                ex_params += f'\n{value}:{input_tuple[index]}'
 
         self.add_item(
             InputText(
@@ -238,6 +242,42 @@ class DrawModal(Modal):
                     await interaction.response.send_message(embed=embed_err, ephemeral=True)
                     await infocog.InfoView.button_hyper(infocog_view, '', interaction)
                     return
+            if 'batch:' in line:
+                batch_check = settings.batch_format(line.split(':', 1)[1])
+                batch = list(batch_check)
+                reply_adds = ''
+                if batch[0] != 1 or batch[1] != 1:
+                    max_batch = settings.batch_format(settings.read('% s' % pen[0].channel.id)['max_batch'])
+                    # if only one number is provided, try to generate the requested amount, prioritizing batch size
+                    if batch[2] == 1:
+                        # if over the limits, cut the number in half and let AIYA scale down
+                        total = max_batch[0] * max_batch[1]
+                        if batch[0] > total:
+                            batch[0] = math.ceil(batch[0] / 2)
+                            batch[1] = math.ceil(batch[0] / 2)
+                        else:
+                            # do... math
+                            difference = math.ceil(batch[0] / max_batch[1])
+                            multiple = int(batch[0] / difference)
+                            new_total = difference * multiple
+                            requested = batch[0]
+                            batch[0], batch[1] = difference, multiple
+                            if requested % difference != 0:
+                                reply_adds += f"\nI can't draw exactly ``{requested}`` pictures! Settling for ``{new_total}``."
+                    # check batch values against the maximum limits
+                    if batch[0] > max_batch[0]:
+                        reply_adds += f"\nThe max batch count I'm allowed here is ``{max_batch[0]}``!"
+                        batch[0] = max_batch[0]
+                    if batch[1] > max_batch[1]:
+                        reply_adds += f"\nThe max batch size I'm allowed here is ``{max_batch[1]}``!"
+                        batch[1] = max_batch[1]
+                
+                if reply_adds == '':
+                    pen[13] = batch
+                else:
+                    invalid_input = True
+                    embed_err.add_field(name=f"`{line.split(':', 1)[1]}` is not allowed! {reply_adds}",
+                                        value=f"{reply_adds}", inline=False)
 
         # stop and give a useful message if any extended edit values aren't recognized
         if invalid_input:
@@ -266,8 +306,8 @@ class DrawModal(Modal):
             channel = '% s' % pen[0].channel.id
             pen[2] = settings.extra_net_defaults(pen[2], channel)
             # set batch to 1
-            if settings.global_var.batch_buttons == "False":
-                pen[13] = [1, 1]
+            # if settings.global_var.batch_buttons == "False":
+            #     pen[13] = [1, 1]
 
             # the updated tuple to send to queue
             prompt_tuple = tuple(pen)
@@ -281,10 +321,13 @@ class DrawModal(Modal):
                 prompt_output += f'\nNew model: ``{new_model}``'
             index_start = 5
             for index, value in enumerate(tuple_names[index_start:], index_start):
-                if index == 13 or index == 16 or index == 18:
+                if index == 16 or index == 18:
                     continue
                 if str(pen[index]) != str(self.input_tuple[index]):
-                    prompt_output += f'\nNew {value}: ``{pen[index]}``'
+                    if index == 13:
+                        prompt_output += f'\nNew {value}: ``batch count: {pen[index][0]}, batch size: {pen[index][1]}``'
+                    else:
+                        prompt_output += f'\nNew {value}: ``{pen[index]}``'
             if str(pen[18]) != 'None':
                 if str(pen[18]) != str(self.input_tuple[18]) and new_net_multi != net_multi or new_net_multi != net_multi:
                     prompt_output += f'\nNew extra network: ``{pen[18]}`` (multiplier: ``{new_net_multi}``)'
